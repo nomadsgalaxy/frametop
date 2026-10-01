@@ -37,10 +37,16 @@ if ! podman container exists dev; then
   "$distrobox" create --yes --name dev --image registry.fedoraproject.org/fedora-toolbox:44
 fi
 "$repo/scripts/container-up.sh"  # in a scope of its own, not this shell's
+# distrobox enter only waits for the container's first-boot init when it starts the container
+# itself; container-up.sh started it, so wait here, or sudo below runs before init sets it up.
+for _ in $(seq 600); do podman logs dev 2>&1 | grep -q container_setup_done && break; sleep 1; done
 "$distrobox" enter dev -- bash -c '
 set -euo pipefail
 echo "installing ${#@} packages (already-installed ones are skipped)"
-sudo dnf install -y -q "$@" 2>&1 | { grep -vE "is already installed|^Nothing to do|^$" || true; }
+# A rootless container cannot trigger udev, so some %post scriptlets (udisks2) fail and dnf
+# reports the transaction failed though every package installed. Trust rpm -q instead.
+{ sudo dnf install -y -q "$@" 2>&1 || true; } | { grep -vE "is already installed|^Nothing to do|^$" || true; }
+rpm -q "$@" >/dev/null || { rpm -q "$@" | grep "not installed" >&2; exit 1; }
 # OpenVR programs built here (the pointer helper and probe) look for the runtime at /opt/steamvr.
 [ -e /opt/steamvr ] || sudo ln -s /run/host/opt/steamvr /opt/steamvr
 echo "dev container ready: $(. /etc/os-release; echo $PRETTY_NAME), glibc $(ldd --version | head -1 | grep -oE "[0-9.]+$")"
