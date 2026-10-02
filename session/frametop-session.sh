@@ -115,6 +115,12 @@ cleanup
 mkdir -m 0700 "$runtime" "$runtime/pulse" "$runtime/bin"
 ln -s "$host_runtime/pulse/native" "$runtime/pulse/native"
 ln -s "$host_runtime"/pipewire* "$runtime/"
+# Daemons that must be one per user, inside this desktop or not: systemd (systemctl --user),
+# gortex and Claude Code's session sockets. Otherwise each side starts or looks for its own.
+mkdir -p -m 0700 "$host_runtime/cc-socks"
+for f in systemd gortex.sock cc-socks; do
+  if [ -e "$host_runtime/$f" ]; then ln -s "$host_runtime/$f" "$runtime/$f"; fi
+done
 
 # plasma-session starts KWin through kwin_wayland_wrapper. Shadow it to add our outputs.
 # With ft-screens the size is only the starting one: ft-screens sets each screen's own.
