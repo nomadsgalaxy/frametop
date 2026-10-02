@@ -287,15 +287,18 @@ void SendTo(int fd, const char *name, const std::string &msg) {
 // window controls under a floating panel only appear while something hovers the
 // panel, and the cursor has to find them the moment they do, not a second later.
 // Paused while the pointer is off: each vrcmd run connects to SteamVR as a new app, and a new
-// app every second kept SteamVR (and the headset's displays) from going to standby.
+// app every second kept SteamVR (and the headset's displays) from going to standby. Every 15 s,
+// not every second, while it's on: each new app also costs SteamVR binding loads, and once a
+// session has spent its budget ("Too many binding loads") lasers stop working until SteamVR
+// restarts (a second's refresh spent it in about 15 minutes of use).
 class OverlayList {
 public:
     void Start() {
         thread_ = std::thread([this] {
             while (running_) {
                 if (!paused_) Refresh();
-                // Wait a second, or less when the pointer wakes (refresh right away then).
-                for (int i = 0; i < 10 && running_; ++i) {
+                // Wait 15 s, or less when the pointer wakes (refresh right away then).
+                for (int i = 0; i < 150 && running_; ++i) {
                     const bool wasPaused = paused_;
                     std::this_thread::sleep_for(std::chrono::milliseconds(100));
                     if (wasPaused && !paused_) break;
